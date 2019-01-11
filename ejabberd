@@ -21,7 +21,7 @@ if user:
     kwargs['auth'] = (user, password)
 
 num_active_days = os.environ.get('NUM_ACTIVE_DAYS', '').split()
-    
+
 
 def post(cmd, payload):
     cmd_uri = '%s/%s' % (uri, cmd)
@@ -103,7 +103,7 @@ vhost_{safe_host}.label Registered users on {host}'''.format(host=host, safe_hos
 #graph_category ejabberd''' % (day, day))
 #        for host, safe_host in safe_hosts:
 #            print('''%s.label %s
-#%s.info Number of active users on %s in the last %s days''' % (safe_host, host, safe_host, host, 
+#%s.info Number of active users on %s in the last %s days''' % (safe_host, host, safe_host, host,
 #    day))
 
     print('''multigraph muc_count
@@ -185,7 +185,7 @@ ipv4.value %s
 ipv6.value %s
 http_bind.value %s
 websockets.value %s
-unknown.value %s""" % (cui_tls, cui_ssl, cui_unenc, cui_compressed, cui_ipv4, cui_ipv6, 
+unknown.value %s""" % (cui_tls, cui_ssl, cui_unenc, cui_compressed, cui_ipv4, cui_ipv6,
                        cui_http_bind, cui_websockets, cui_unknown))
 
 #for day in num_active_days:
