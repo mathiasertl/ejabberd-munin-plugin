@@ -31,10 +31,10 @@ def post(cmd, payload):
     if response.status_code != 200:
         print("%s: HTTP %s: %s" % (cmd, response.status_code, response.text), file=sys.stderr)
         return
-    return response
+    return response.json()
 
 
-hosts = post('registered_vhosts', {}).json()
+hosts = post('registered_vhosts', {})
 if not hosts:
     sys.ext(1)
 safe_hosts = [(h, re.sub('[^a-zA-Z0-9_]', '_',)) for h in hosts]
@@ -121,85 +121,94 @@ graph_category MUC''')
 
     sys.exit(0)
 
-s2s_out = post('outgoing_s2s_number', {}).json()['s2s_outgoing']
-s2s_in = post('incoming_s2s_number', {}).json()['s2s_incoming']
-connected = post('connected_users_number', {}).json()['num_sessions']
+s2s_out = post('outgoing_s2s_number', {})['s2s_outgoing']
+s2s_in = post('incoming_s2s_number', {})['s2s_incoming']
+connected = post('connected_users_number', {})['num_sessions']
 print('''multigraph ejabberd
 connected_users.value %s
 s2s_connections_in.value %s
 s2s_connections_out.value %s''' % (connected, s2s_in, s2s_out))
 
 for host, safe_host in safe_hosts:
-    val = post('stats_host', {'name': 'onlineusers', 'host': host}).json()['stat']
+    val = post('stats_host', {'name': 'onlineusers', 'host': host})['stat']
+    if val is None:
+        continue
     print('%s_connected.value %s' % (safe_host, val))
 
-uptime = post('stats', {'name': 'uptimeseconds'}).json()['stat']
-print('''multigraph ejabberd_uptime
-uptime.value %.4f''' % (uptime / 86400))
+uptime = post('stats', {'name': 'uptimeseconds'})['stat']
+if uptime is not None:
+    print('''multigraph ejabberd_uptime
+    uptime.value %.4f''' % (uptime / 86400))
 
-registered_total = post('stats', {'name': 'registeredusers'}).json()['stat']
-print('''multigraph ejabberd_registered
-total.value %s''' % registered_total)
+registered_total = post('stats', {'name': 'registeredusers'})['stat']
+if registered_total is not None:
+    print('''multigraph ejabberd_registered
+    total.value %s''' % registered_total)
 
 for host, safe_host in safe_hosts:
-    val = post('stats_host', {'name': 'registeredusers', 'host': host}).json()['stat']
+    val = post('stats_host', {'name': 'registeredusers', 'host': host})['stat']
+    if val is None:
+        continue
     print('vhost_%s.value %s' % (safe_host, val))
 
-connected_users_info = post('connected_users_info', {}).json()
-cui_ipv4 = 0
-cui_ipv6 = 0
-cui_compressed = 0
-cui_tls = 0
-cui_ssl = 0
-cui_http_bind = 0
-cui_unknown = 0
-cui_websockets = 0
-cui_unenc = 0
-for line in connected_users_info:
-    if line['ip'].startswith('::FFFF:'):
-        cui_ipv4 += 1
-    else:
-        cui_ipv6 += 1
+connected_users_info = post('connected_users_info', {})
+if connected_users_info is not None:
+    cui_ipv4 = 0
+    cui_ipv6 = 0
+    cui_compressed = 0
+    cui_tls = 0
+    cui_ssl = 0
+    cui_http_bind = 0
+    cui_unknown = 0
+    cui_websockets = 0
+    cui_unenc = 0
+    for line in connected_users_info:
+        if line['ip'].startswith('::FFFF:'):
+            cui_ipv4 += 1
+        else:
+            cui_ipv6 += 1
 
-    cui_conn = line['connection']
+        cui_conn = line['connection']
 
-    if 'tls' in cui_conn:
-        cui_tls += 1
-    elif 'ssl' in cui_conn:
-        cui_ssl += 1
-    elif cui_conn == 'http_bind':
-        cui_http_bind += 1
-    elif cui_conn == 'websocket':
-        cui_websockets += 1
-    elif cui_conn == 'unknown':
-        cui_unknown += 1
-    else:
-        cui_unenc += 1
+        if 'tls' in cui_conn:
+            cui_tls += 1
+        elif 'ssl' in cui_conn:
+            cui_ssl += 1
+        elif cui_conn == 'http_bind':
+            cui_http_bind += 1
+        elif cui_conn == 'websocket':
+            cui_websockets += 1
+        elif cui_conn == 'unknown':
+            cui_unknown += 1
+        else:
+            cui_unenc += 1
 
-    if 'compressed' in cui_conn:
-        cui_compressed += 1
+        if 'compressed' in cui_conn:
+            cui_compressed += 1
 
-print("""multigraph ejabberd_c2s_types
-tls.value %s
-ssl.value %s
-unencrypted.value %s
-compressed.value %s
-ipv4.value %s
-ipv6.value %s
-http_bind.value %s
-websockets.value %s
-unknown.value %s""" % (cui_tls, cui_ssl, cui_unenc, cui_compressed, cui_ipv4, cui_ipv6,
-                       cui_http_bind, cui_websockets, cui_unknown))
+    print("""multigraph ejabberd_c2s_types
+    tls.value %s
+    ssl.value %s
+    unencrypted.value %s
+    compressed.value %s
+    ipv4.value %s
+    ipv6.value %s
+    http_bind.value %s
+    websockets.value %s
+    unknown.value %s""" % (cui_tls, cui_ssl, cui_unenc, cui_compressed, cui_ipv4, cui_ipv6,
+                           cui_http_bind, cui_websockets, cui_unknown))
 
 #for day in num_active_days:
 #    print('multigraph ejabberd_active_users_%s' % day)
 #    for host, safe_host in safe_hosts:
-#        val = post('num_active_users', {'host': host, 'days': int(day)}).json()['users']
+#        val = post('num_active_users', {'host': host, 'days': int(day)})['users']
 #        print('%s.value %s' % (safe_host, val))
 
 print('multigraph muc_count')
 for host, safe_host in safe_hosts:
     resp = post('muc_online_rooms', {'host': host})
+    if resp is not None:
+        continue
     #print(resp.text)
-    val = len(resp.json())
+    val = len(resp)
     print('%s.value %s' % (safe_host, val))
