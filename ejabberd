@@ -2,6 +2,7 @@
 
 import os
 import sys
+import re
 import requests
 
 if 'autoconf' in sys.argv:
@@ -29,12 +30,14 @@ def post(cmd, payload):
 
     if response.status_code != 200:
         print("%s: HTTP %s: %s" % (cmd, response.status_code, response.text), file=sys.stderr)
-        sys.exit(42)
+        return
     return response
 
 
 hosts = post('registered_vhosts', {}).json()
-safe_hosts = [(h, h.replace('.', '_')) for h in hosts]
+if not hosts:
+    sys.ext(1)
+safe_hosts = [(h, re.sub('[^a-zA-Z0-9_]', '_',)) for h in hosts]
 
 
 if 'config' in sys.argv:
