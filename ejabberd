@@ -121,33 +121,51 @@ graph_category MUC''')
 
     sys.exit(0)
 
-s2s_out = post('outgoing_s2s_number', {})['s2s_outgoing']
-s2s_in = post('incoming_s2s_number', {})['s2s_incoming']
-connected = post('connected_users_number', {})['num_sessions']
-print('''multigraph ejabberd
-connected_users.value %s
-s2s_connections_in.value %s
-s2s_connections_out.value %s''' % (connected, s2s_in, s2s_out))
+
+print('multigraph ejabberd')
+s2s_out = post('outgoing_s2s_number', {})
+if s2s_out is None:
+    print('s2s_connections_out.value 0')
+else:
+    print('s2s_connections_out.value %s' % s2s_out['s2s_outgoing'])
+s2s_out = post('incoming_s2s_number', {})
+if s2s_out is None:
+    print('s2s_connections_in.value 0')
+else:
+    print('s2s_connections_in.value %s' % s2s_out['s2s_incoming'])
+connected = post('connected_users_number', {})
+if connected is None:
+    print('connected_users.value 0')
+else:
+    print('connected_users.value %s' % connected['num_sessions'])
 
 for host, safe_host in safe_hosts:
     val = post('stats_host', {'name': 'onlineusers', 'host': host})
     if val is not None:
         print('%s_connected.value %s' % (safe_host, val.get('stat', 0)))
+    else:
+        print('%s_connected.value 0' % safe_host)
 
+print('multigraph ejabberd_uptime')
 uptime = post('stats', {'name': 'uptimeseconds'})
 if uptime is not None:
-    print('''multigraph ejabberd_uptime
-    uptime.value %.4f''' % (uptime.get('stats', 0) / 86400))
+    print('uptime.value %.4f' % (uptime.get('stats', 0) / 86400))
+else:
+    print('uptime.value 0')
 
 print('multigraph ejabberd_registered')
 registered_total = post('stats', {'name': 'registeredusers'})['stat']
 if registered_total is not None:
-    print('toatal.value %s' % registered_total['stat'])
+    print('total.value %s' % registered_total.get('stat', 0))
+else:
+    print('total.value 0')
 
 for host, safe_host in safe_hosts:
     val = post('stats_host', {'name': 'registeredusers', 'host': host})
     if val is not None:
         print('vhost_%s.value %s' % (safe_host, val.get('stat', 0)))
+    else:
+        print('vhost_%s.value 0')
 
 connected_users_info = post('connected_users_info', {})
 if connected_users_info is not None:
