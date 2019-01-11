@@ -1,0 +1,202 @@
+#!/usr/bin/python3
+
+import os
+import sys
+import requests
+
+if 'autoconf' in sys.argv:
+    print('yes')
+    sys.exit(0)
+
+uri = os.environ.get('API_URL', 'http://127.0.0.1:5280/api')
+kwargs = {
+    'headers': {
+        'X-Admin': 'true',
+    }
+}
+
+user = os.environ.get('API_USER')
+if user:
+    password = os.environ.get('API_PASSWORD')
+    kwargs['auth'] = (user, password)
+
+num_active_days = os.environ.get('NUM_ACTIVE_DAYS', '').split()
+    
+
+def post(cmd, payload):
+    cmd_uri = '%s/%s' % (uri, cmd)
+    response = requests.post(cmd_uri, json=payload, **kwargs)
+
+    if response.status_code != 200:
+        print("%s: HTTP %s: %s" % (cmd, response.status_code, response.text), file=sys.stderr)
+        sys.exit(42)
+    return response
+
+
+hosts = post('registered_vhosts', {}).json()
+safe_hosts = [(h, h.replace('.', '_')) for h in hosts]
+
+
+if 'config' in sys.argv:
+    print('''multigraph ejabberd_c2s_types
+graph_args --base 1000 -l 0
+graph_category ejabberd
+graph_info used connection features
+graph_scale no
+graph_title Ejabberd connection types
+graph_vlabel users
+tls.label TLS
+unencrypted.label Unencrypted
+ipv4.label IPv4
+ipv6.label IPv6
+http_bind.label HTTP Binding
+websockets.label Websockets
+unknown.label Unknown
+compressed.label compression
+ssl.label SSL
+multigraph ejabberd_uptime
+graph_title ejabberd uptime
+graph_args --base 1000 -l 0
+graph_vlabel uptime in days
+uptime.label uptime
+uptime.draw AREA
+graph_category ejabberd
+multigraph ejabberd
+graph_title ejabberd connections
+graph_args --base 1000 -l 0
+graph_category ejabberd
+graph_info Connection statistics for ejabberd
+graph_scale no
+graph_vlabel connections
+s2s_connections_in.info Number of incoming server to server connections
+s2s_connections_in.label outgoing s2s connections
+s2s_connections_out.info Number of outgoing server to server connections
+s2s_connections_out.label incoming s2s connections
+connected_users.info Number of logged in users
+connected_users.label connected users''')
+
+    for host, safe_host in safe_hosts:
+        print('''{safe_host}_connected.info Number of logged in users on {host}
+{safe_host}_connected.label connected users - {host}'''.format(host=host, safe_host=safe_host))
+
+    print('''multigraph ejabberd_registered
+graph_title ejabberd registered users
+graph_args --base 1000 -l 0
+graph_category ejabberd
+graph_info Number of users registered on this server
+graph_scale no
+graph_vlabel users
+total.label Total
+total.graph no
+total.info Total registered users''')
+
+    for host, safe_host in safe_hosts:
+        print('''vhost_{safe_host}.info Registered users on {host}
+vhost_{safe_host}.label Registered users on {host}'''.format(host=host, safe_host=safe_host))
+
+#    for day in num_active_days:
+#        print('''multigraph ejabberd_active_users_%s
+#graph_title Number of active users in the last %s days
+#graph_args --base 1000 -l 0
+#graph_vlabel users
+#graph_scale no
+#graph_category ejabberd''' % (day, day))
+#        for host, safe_host in safe_hosts:
+#            print('''%s.label %s
+#%s.info Number of active users on %s in the last %s days''' % (safe_host, host, safe_host, host, 
+#    day))
+
+    print('''multigraph muc_count
+graph_title Number of multi-user chats
+graph_args --base 1000 -l 0
+graph_vlabel No. of rooms
+graph_category MUC''')
+
+    for host, safe_host in safe_hosts:
+        print('''%s.label %s
+%s.info Number of MUCs on %s''' % (safe_host, host, safe_host, host))
+
+    sys.exit(0)
+
+s2s_out = post('outgoing_s2s_number', {}).json()['s2s_outgoing']
+s2s_in = post('incoming_s2s_number', {}).json()['s2s_incoming']
+connected = post('connected_users_number', {}).json()['num_sessions']
+print('''multigraph ejabberd
+connected_users.value %s
+s2s_connections_in.value %s
+s2s_connections_out.value %s''' % (connected, s2s_in, s2s_out))
+
+for host, safe_host in safe_hosts:
+    val = post('stats_host', {'name': 'onlineusers', 'host': host}).json()['stat']
+    print('%s_connected.value %s' % (safe_host, val))
+
+uptime = post('stats', {'name': 'uptimeseconds'}).json()['stat']
+print('''multigraph ejabberd_uptime
+uptime.value %.4f''' % (uptime / 86400))
+
+registered_total = post('stats', {'name': 'registeredusers'}).json()['stat']
+print('''multigraph ejabberd_registered
+total.value %s''' % registered_total)
+
+for host, safe_host in safe_hosts:
+    val = post('stats_host', {'name': 'registeredusers', 'host': host}).json()['stat']
+    print('vhost_%s.value %s' % (safe_host, val))
+
+connected_users_info = post('connected_users_info', {}).json()
+cui_ipv4 = 0
+cui_ipv6 = 0
+cui_compressed = 0
+cui_tls = 0
+cui_ssl = 0
+cui_http_bind = 0
+cui_unknown = 0
+cui_websockets = 0
+cui_unenc = 0
+for line in connected_users_info:
+    if line['ip'].startswith('::FFFF:'):
+        cui_ipv4 += 1
+    else:
+        cui_ipv6 += 1
+
+    cui_conn = line['connection']
+
+    if 'tls' in cui_conn:
+        cui_tls += 1
+    elif 'ssl' in cui_conn:
+        cui_ssl += 1
+    elif cui_conn == 'http_bind':
+        cui_http_bind += 1
+    elif cui_conn == 'websocket':
+        cui_websockets += 1
+    elif cui_conn == 'unknown':
+        cui_unknown += 1
+    else:
+        cui_unenc += 1
+
+    if 'compressed' in cui_conn:
+        cui_compressed += 1
+
+print("""multigraph ejabberd_c2s_types
+tls.value %s
+ssl.value %s
+unencrypted.value %s
+compressed.value %s
+ipv4.value %s
+ipv6.value %s
+http_bind.value %s
+websockets.value %s
+unknown.value %s""" % (cui_tls, cui_ssl, cui_unenc, cui_compressed, cui_ipv4, cui_ipv6, 
+                       cui_http_bind, cui_websockets, cui_unknown))
+
+#for day in num_active_days:
+#    print('multigraph ejabberd_active_users_%s' % day)
+#    for host, safe_host in safe_hosts:
+#        val = post('num_active_users', {'host': host, 'days': int(day)}).json()['users']
+#        print('%s.value %s' % (safe_host, val))
+
+print('multigraph muc_count')
+for host, safe_host in safe_hosts:
+    resp = post('muc_online_rooms', {'host': host})
+    #print(resp.text)
+    val = len(resp.json())
+    print('%s.value %s' % (safe_host, val))
