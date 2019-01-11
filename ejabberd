@@ -37,7 +37,7 @@ def post(cmd, payload):
 hosts = post('registered_vhosts', {})
 if not hosts:
     sys.ext(1)
-safe_hosts = [(h, re.sub('[^a-zA-Z0-9_]', '_',)) for h in hosts]
+safe_hosts = [(h, re.sub('[^a-zA-Z0-9_]', '_', h)) for h in hosts]
 
 
 if 'config' in sys.argv:
@@ -124,48 +124,34 @@ graph_category MUC''')
 
 print('multigraph ejabberd')
 s2s_out = post('outgoing_s2s_number', {})
-if s2s_out is None:
-    print('s2s_connections_out.value 0')
-else:
+if s2s_out is not None:
     print('s2s_connections_out.value %s' % s2s_out['s2s_outgoing'])
 s2s_out = post('incoming_s2s_number', {})
-if s2s_out is None:
-    print('s2s_connections_in.value 0')
-else:
+if s2s_out is not None:
     print('s2s_connections_in.value %s' % s2s_out['s2s_incoming'])
 connected = post('connected_users_number', {})
-if connected is None:
-    print('connected_users.value 0')
-else:
+if connected is not None:
     print('connected_users.value %s' % connected['num_sessions'])
 
 for host, safe_host in safe_hosts:
     val = post('stats_host', {'name': 'onlineusers', 'host': host})
     if val is not None:
         print('%s_connected.value %s' % (safe_host, val.get('stat', 0)))
-    else:
-        print('%s_connected.value 0' % safe_host)
 
 print('multigraph ejabberd_uptime')
 uptime = post('stats', {'name': 'uptimeseconds'})
 if uptime is not None:
     print('uptime.value %.4f' % (uptime.get('stats', 0) / 86400))
-else:
-    print('uptime.value 0')
 
 print('multigraph ejabberd_registered')
-registered_total = post('stats', {'name': 'registeredusers'})['stat']
+registered_total = post('stats', {'name': 'registeredusers'})
 if registered_total is not None:
     print('total.value %s' % registered_total.get('stat', 0))
-else:
-    print('total.value 0')
 
 for host, safe_host in safe_hosts:
     val = post('stats_host', {'name': 'registeredusers', 'host': host})
     if val is not None:
         print('vhost_%s.value %s' % (safe_host, val.get('stat', 0)))
-    else:
-        print('vhost_%s.value 0')
 
 connected_users_info = post('connected_users_info', {})
 if connected_users_info is not None:
@@ -203,16 +189,16 @@ if connected_users_info is not None:
             cui_compressed += 1
 
     print("""multigraph ejabberd_c2s_types
-    tls.value %s
-    ssl.value %s
-    unencrypted.value %s
-    compressed.value %s
-    ipv4.value %s
-    ipv6.value %s
-    http_bind.value %s
-    websockets.value %s
-    unknown.value %s""" % (cui_tls, cui_ssl, cui_unenc, cui_compressed, cui_ipv4, cui_ipv6,
-                           cui_http_bind, cui_websockets, cui_unknown))
+tls.value %s
+ssl.value %s
+unencrypted.value %s
+compressed.value %s
+ipv4.value %s
+ipv6.value %s
+http_bind.value %s
+websockets.value %s
+unknown.value %s""" % (cui_tls, cui_ssl, cui_unenc, cui_compressed, cui_ipv4, cui_ipv6,
+                       cui_http_bind, cui_websockets, cui_unknown))
 
 #for day in num_active_days:
 #    print('multigraph ejabberd_active_users_%s' % day)
