@@ -130,26 +130,24 @@ s2s_connections_in.value %s
 s2s_connections_out.value %s''' % (connected, s2s_in, s2s_out))
 
 for host, safe_host in safe_hosts:
-    val = post('stats_host', {'name': 'onlineusers', 'host': host})['stat']
-    if val is None:
-        continue
-    print('%s_connected.value %s' % (safe_host, val))
+    val = post('stats_host', {'name': 'onlineusers', 'host': host})
+    if val is not None:
+        print('%s_connected.value %s' % (safe_host, val.get('stat', 0)))
 
-uptime = post('stats', {'name': 'uptimeseconds'})['stat']
+uptime = post('stats', {'name': 'uptimeseconds'})
 if uptime is not None:
     print('''multigraph ejabberd_uptime
-    uptime.value %.4f''' % (uptime / 86400))
+    uptime.value %.4f''' % (uptime.get('stats', 0) / 86400))
 
+print('multigraph ejabberd_registered')
 registered_total = post('stats', {'name': 'registeredusers'})['stat']
 if registered_total is not None:
-    print('''multigraph ejabberd_registered
-    total.value %s''' % registered_total)
+    print('toatal.value %s' % registered_total['stat'])
 
 for host, safe_host in safe_hosts:
-    val = post('stats_host', {'name': 'registeredusers', 'host': host})['stat']
-    if val is None:
-        continue
-    print('vhost_%s.value %s' % (safe_host, val))
+    val = post('stats_host', {'name': 'registeredusers', 'host': host})
+    if val is not None:
+        print('vhost_%s.value %s' % (safe_host, val.get('stat', 0)))
 
 connected_users_info = post('connected_users_info', {})
 if connected_users_info is not None:
@@ -208,7 +206,4 @@ print('multigraph muc_count')
 for host, safe_host in safe_hosts:
     resp = post('muc_online_rooms', {'host': host})
     if resp is not None:
-        continue
-    #print(resp.text)
-    val = len(resp)
-    print('%s.value %s' % (safe_host, val))
+        print('%s.value %s' % (safe_host, len(resp)))
